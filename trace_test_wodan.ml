@@ -53,8 +53,10 @@ end)
 let v () =
   let root = "wodan.img" in
   let%lwt disk = Block.connect root in
+  let%lwt info = Block.get_info disk in
+  let%lwt () = Nocrypto_entropy_lwt.initialize () in
   let%lwt (stor, _gen) = Stor.prepare_io
-    Wodan.OpenExistingDevice disk
+    (Wodan.FormatEmptyDevice Int64.(div (mul info.size_sectors @@ of_int info.sector_size) @@ of_int Stor.P.block_size)) disk
     {Wodan.standard_mount_options with cache_size=2048}
   in Lwt.return stor
 
