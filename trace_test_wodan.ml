@@ -71,6 +71,7 @@ let ok = function
 let t1 = Unix.gettimeofday ()
 
 let () =
+  Sys.catch_break true;
   let txn = ok (Lmdb.create_rw_txn v) in
   let db = ok (Lmdb.opendb txn) in
   let t = Unix.gettimeofday () in
@@ -104,8 +105,11 @@ let () =
   in
   try
     loop (txn, db, t)
-  with End_of_file ->
-    Printf.printf "Max key length %d" !mkl
+  with
+  |End_of_file ->
+    Printf.printf "Max key length %d\n" !mkl
+  |Sys.Break ->
+    Printf.printf "Max key length %d\n" !mkl
 
 let t2 = Unix.gettimeofday ()
 let () = Printf.printf "TOTAL %0.2f\n%!" (t2 -. t1);
