@@ -1,14 +1,4 @@
 let path = Sys.argv.(1)
-let sync_flag =
-  if Array.length Sys.argv > 2 then
-    match String.lowercase_ascii Sys.argv.(2) with
-    | "nosync" -> [ Lmdb.NoSync ]
-    | "nometasync" -> [ Lmdb.NoMetaSync ]
-    | s ->
-        Format.eprintf "unknown %s@." s;
-        exit 1
-  else
-    []
 
 type key = string
 
@@ -47,69 +37,75 @@ let read_one ic =
   | _ ->
     failwith (Printf.sprintf "Unknown action %c" c)
 
-let v =
-  let root = "./testmdb/" in
-  let flags = Lmdb.NoRdAhead :: Lmdb.NoTLS :: sync_flag in
-  let file_flags = 0o644 in
-  let mapsize = 40_960_000_000L in
-  let () = Unix.mkdir root 0o755 in
-  match Lmdb.opendir ~mapsize ~flags root file_flags with
-  | Error err ->
-      failwith (Lmdb.string_of_error err)
-  | Ok db -> db
+(* Block is from mirage-block-unix *)
+(* https://g2p.github.io/wodan/doc/wodan-for-mirage.html#9 *)
+module Block = struct
+  include Wodan.BlockCompat(Block)
+  let connect name = Block.connect name
+end
+
+module Stor = Wodan.Make(Block)(struct
+  include Wodan.StandardSuperblockParams
+  let key_size = 64
+  let block_size = 256*1024
+end)
+
+let v () =
+  let root = "wodan.img" in
+  let%lwt disk = Block.connect root in
+  let%lwt (stor, _gen) = Stor.prepare_io
+    Wodan.OpenExistingDevice disk
+    {Wodan.standard_mount_options with cache_size=2048}
+  in Lwt.return stor
 
 let f = open_in_bin path
 
-let assert_ok = function
-  | Ok _ -> ()
-  | Error err -> failwith (Lmdb.string_of_error err)
-
-let ok = function
-  | Ok v -> v
-  | Error err -> failwith (Lmdb.string_of_error err)
-
 let t1 = Unix.gettimeofday ()
 
-let () =
+let unwrap_opt = function
+|None -> failwith "Expected Some"
+|Some x -> x
+
+let%lwt () =
   Sys.catch_break true;
-  let txn = ok (Lmdb.create_rw_txn v) in
-  let db = ok (Lmdb.opendb txn) in
+  let%lwt stor = v () in
   let t = Unix.gettimeofday () in
   let mkl = ref 0 in
-  let rec loop (txn, db, t) =
+  let rec loop t =
     let elt = read_one f in
     match elt with
     | Read k ->
         let mkl' = String.length k in
         if mkl' > !mkl then mkl := mkl';
-        let b = ok (Lmdb.get txn db k) in
-        let _v = Bigarray.Array1.get b 0 in
-        loop (txn, db, t)
+        let%lwt b = Stor.lookup stor @@ Stor.key_of_string_padded k in
+        let _b = unwrap_opt b in
+        loop t
     | Mem k ->
         let mkl' = String.length k in
         if mkl' > !mkl then mkl := mkl';
-        assert_ok (Lmdb.mem txn db k);
-        loop (txn, db, t)
+        let%lwt b = Stor.mem stor @@ Stor.key_of_string_padded k in
+        assert b;
+        loop t
     | Write (k, l) ->
         let mkl' = String.length k in
         if mkl' > !mkl then mkl := mkl';
-        assert_ok (Lmdb.put_string txn db k (String.make l '\000'));
-        loop (txn, db, t)
+        let%lwt () = Stor.insert stor (Stor.key_of_string_padded k) (Stor.value_of_string @@ String.make l '\000') in
+        loop t
     | Commit ->
-        assert_ok (Lmdb.commit_txn txn);
+        let%lwt _gen = Stor.flush stor in
         let t' = Unix.gettimeofday () in
         Printf.printf "%0.2f\n%!" (t' -. t);
-        let txn = ok (Lmdb.create_rw_txn v) in
-        let db = ok (Lmdb.opendb txn) in
-        loop (txn, db, t')
+        loop t'
   in
   try
-    loop (txn, db, t)
+    loop t
   with
   |End_of_file ->
-    Printf.printf "Max key length %d\n" !mkl
+      Printf.printf "Max key length %d\n" !mkl;
+      Lwt.return_unit
   |Sys.Break ->
-    Printf.printf "Max key length %d\n" !mkl
+      Printf.printf "Max key length %d\n" !mkl;
+      Lwt.return_unit
 
 let t2 = Unix.gettimeofday ()
 let () = Printf.printf "TOTAL %0.2f\n%!" (t2 -. t1);
