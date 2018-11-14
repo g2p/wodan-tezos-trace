@@ -70,6 +70,8 @@ let unwrap_opt = function
 
 let%lwt () =
   Sys.catch_break true;
+  Logs.set_reporter @@ Logs.format_reporter ();
+  Logs.set_level @@ Some Logs.Debug;
   let%lwt stor = v () in
   let t = Unix.gettimeofday () in
   let mkl = ref 0 in
