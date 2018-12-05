@@ -47,7 +47,7 @@ end
 module Stor = Wodan.Make(Block)(struct
   include Wodan.StandardSuperblockParams
   let key_size = 64
-  let block_size = 256*1024
+  let block_size = 64*1024
 end)
 
 let v () =
