@@ -1,0 +1,6 @@
+[submodule "ocaml-lmdb"]
+	path = ocaml-lmdb
+	url = https://github.com/vbmithr/ocaml-lmdb.git
+[submodule "wodan"]
+	path = wodan
+	url = https://github.com/mirage/wodan.git
