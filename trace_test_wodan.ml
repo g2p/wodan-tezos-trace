@@ -64,10 +64,6 @@ let f = open_in_bin path
 
 let t1 = Unix.gettimeofday ()
 
-let unwrap_opt = function
-|None -> failwith "Expected Some"
-|Some x -> x
-
 let%lwt () =
   Sys.catch_break true;
   Logs.set_reporter @@ Logs.format_reporter ();
@@ -82,7 +78,10 @@ let%lwt () =
         let mkl' = String.length k in
         if mkl' > !mkl then mkl := mkl';
         let%lwt b = Stor.lookup stor @@ Stor.key_of_string_padded k in
-        let _b = unwrap_opt b in
+        (match b with
+         | Some _b -> ()
+         | None -> failwith (Printf.sprintf "Missing key %s" k)
+        );
         loop t
     | Mem k ->
         let mkl' = String.length k in
