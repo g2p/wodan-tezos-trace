@@ -66,8 +66,8 @@ let t1 = Unix.gettimeofday ()
 
 let%lwt () =
   Sys.catch_break true;
-  Logs.set_reporter @@ Logs.format_reporter ();
-  Logs.set_level @@ Some Logs.Debug;
+  (*Logs.set_reporter @@ Logs.format_reporter ();
+  Logs.set_level @@ Some Logs.Debug;*)
   let%lwt stor = v () in
   let t = Unix.gettimeofday () in
   let mkl = ref 0 in
@@ -97,7 +97,7 @@ let%lwt () =
     | Commit ->
         let%lwt _gen = Stor.flush stor in
         let t' = Unix.gettimeofday () in
-        Printf.printf "%0.2f\n%!" (t' -. t);
+        (*Printf.printf "%0.2f\n%!" (t' -. t);*)
         loop t'
   in
   try
