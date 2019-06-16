@@ -59,7 +59,7 @@ let v () =
   let%lwt () = Nocrypto_entropy_lwt.initialize () in
   let%lwt (stor, _gen) = Stor.prepare_io
     (Wodan.FormatEmptyDevice Int64.(div (mul info.size_sectors @@ of_int info.sector_size) @@ of_int Stor.P.block_size)) disk
-    {Wodan.standard_mount_options with cache_size=2*64*1024; relax = { magic_crc = true; magic_crc_write = true}}
+    {Wodan.standard_mount_options with cache_size=3*32*1024; relax = { magic_crc = true; magic_crc_write = true}}
   in Lwt.return stor
 
 let f = open_in_bin path
