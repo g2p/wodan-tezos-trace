@@ -72,6 +72,7 @@ let%lwt () =
   Logs.set_level @@ Some Logs.Info;
   let%lwt stor = v () in
   let mkl = ref 0 in
+  let mvl = ref 0 in
   let flush_req_counter = ref 0 in
   let rec loop () =
     let elt = read_one f in
@@ -94,6 +95,7 @@ let%lwt () =
     | Write (k, l) ->
         let mkl' = String.length k in
         if mkl' > !mkl then mkl := mkl';
+        if l > !mvl then mvl := l;
         let%lwt () = Stor.insert stor (Stor.key_of_string_padded k) (Stor.value_of_string @@ String.make l '\000') in
         loop ()
     | Commit ->
@@ -109,9 +111,11 @@ let%lwt () =
   with
   |End_of_file ->
       Printf.printf "Max key length %d\n" !mkl;
+      Printf.printf "Max value length %d\n" !mvl;
       Lwt.return_unit
   |Sys.Break ->
       Printf.printf "Max key length %d\n" !mkl;
+      Printf.printf "Max value length %d\n" !mvl;
       Lwt.return_unit
 
 let t2 = Unix.gettimeofday ()
