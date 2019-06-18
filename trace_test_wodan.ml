@@ -78,8 +78,6 @@ let%lwt () =
     let elt = read_one f in
     match elt with
     | Read k ->
-        let mkl' = String.length k in
-        if mkl' > !mkl then mkl := mkl';
         let%lwt b = Stor.lookup stor @@ Stor.key_of_string_padded k in
         (match b with
          | Some _b -> ()
@@ -87,8 +85,6 @@ let%lwt () =
         );
         loop ()
     | Mem k ->
-        let mkl' = String.length k in
-        if mkl' > !mkl then mkl := mkl';
         let%lwt b = Stor.mem stor @@ Stor.key_of_string_padded k in
         assert b;
         loop ()
